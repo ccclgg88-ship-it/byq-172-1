@@ -233,8 +233,7 @@ export default function WallPage() {
         )}
       </div>
 
-      {isLoggedIn && (
-        <div className="flex gap-2 p-1 bg-white rounded-xl border border-slate-100">
+      <div className="flex gap-2 p-1 bg-white rounded-xl border border-slate-100">
           <button
             onClick={() => handleSortChange('latest')}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -244,17 +243,18 @@ export default function WallPage() {
             <Clock className="w-4 h-4" />
             最新
           </button>
-          <button
-            onClick={() => handleSortChange('compatibility')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-              sort === 'compatibility' ? 'bg-brand-50 text-brand-600' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            合拍度
-          </button>
+          {isLoggedIn && (
+            <button
+              onClick={() => handleSortChange('compatibility')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                sort === 'compatibility' ? 'bg-brand-50 text-brand-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              合拍度
+            </button>
+          )}
         </div>
-      )}
 
       {!isLoggedIn && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-5 flex items-center justify-between gap-4">

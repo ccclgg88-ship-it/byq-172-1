@@ -102,7 +102,7 @@ export default function HomePage() {
 
               <button
                 onClick={handleAssess}
-                disabled={loading || !isLoggedIn}
+                disabled={loading}
                 className="w-full py-3.5 rounded-2xl bg-white text-brand-700 font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -140,7 +140,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {isLoggedIn && user && (
+          {isLoggedIn && (
             <div className="mt-6 grid grid-cols-2 gap-4">
               <button
                 onClick={() => navigate('/profile')}

@@ -8,16 +8,18 @@ import ProfilePage from '@/pages/ProfilePage';
 import WallPage from '@/pages/WallPage';
 
 function App() {
-  const { isLoggedIn, token, checkAuth } = useAuthStore();
+  const { isLoggedIn, token, user, checkAuth } = useAuthStore();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (token) {
-      checkAuth().finally(() => setChecked(true));
-    } else {
+    const init = async () => {
+      if (token && !user) {
+        await checkAuth();
+      }
       setChecked(true);
-    }
-  }, []);
+    };
+    init();
+  }, [token, user, checkAuth]);
 
   if (!checked) {
     return (

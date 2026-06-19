@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 
 export default function LoginPage() {
@@ -11,25 +11,49 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login, register } = useAuthStore();
+  const { login, register, isLoggedIn } = useAuthStore();
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedNick = nickname.trim();
+    const trimmedPwd = password.trim();
+
+    if (!trimmedNick) {
+      setError('请输入昵称');
+      return;
+    }
+    if (!trimmedPwd) {
+      setError('请输入密码');
+      return;
+    }
+    if (trimmedPwd.length < 4) {
+      setError('密码至少4位');
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {
       if (mode === 'login') {
-        await login(nickname, password);
+        await login(trimmedNick, trimmedPwd);
       } else {
-        await register(nickname, password);
+        await register(trimmedNick, trimmedPwd);
       }
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (err: any) {
-      setError(err.message || '操作失败');
+      setError(err.message || '操作失败，请重试');
     } finally {
       setLoading(false);
     }
   };
+
+  const canSubmit = nickname.trim().length > 0 && password.trim().length >= 4 && !loading;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-brand-100 flex items-center justify-center px-4">
@@ -97,13 +121,16 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</div>
+              <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
             )}
 
             <button
               type="submit"
-              disabled={loading || !nickname || !password}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 text-white font-medium text-sm shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              disabled={!canSubmit}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 text-white font-medium text-sm shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
             >
               {loading ? '处理中...' : mode === 'login' ? '登录' : '创建账号'}
             </button>
