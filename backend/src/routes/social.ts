@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getDb, UserRow, FollowRow } from '../db.js';
+import { getDb, UserRow, FollowRow, createMessage } from '../db.js';
 import { authMiddleware } from '../auth.js';
 
 const router = Router();
@@ -62,6 +62,21 @@ router.post('/follow', authMiddleware, (req: Request, res: Response) => {
   const mutual = db.prepare(
     'SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?'
   ).get(target.id, userId);
+
+  const targetBlockedMe = db.prepare(
+    'SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?'
+  ).get(target.id, userId);
+  if (!targetBlockedMe) {
+    createMessage(db, userId, target.id, 'follow');
+  }
+  if (mutual) {
+    const meBlockedTarget = db.prepare(
+      'SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?'
+    ).get(userId, target.id);
+    if (!meBlockedTarget) {
+      createMessage(db, target.id, userId, 'mutual_follow');
+    }
+  }
 
   res.json({
     success: true,

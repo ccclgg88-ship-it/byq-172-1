@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Home, User, Users, LogOut, Sparkles } from 'lucide-react';
+import { useEffect } from 'react';
+import { Home, User, Users, LogOut, Sparkles, Bell } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 
 const navItems = [
@@ -11,7 +12,16 @@ const navItems = [
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoggedIn, user, logout } = useAuthStore();
+  const { isLoggedIn, user, logout, unreadCount, fetchUnreadCount } = useAuthStore();
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetchUnreadCount();
+    const timer = setInterval(() => {
+      fetchUnreadCount();
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [isLoggedIn, fetchUnreadCount]);
 
   const handleLogout = () => {
     logout();
@@ -40,6 +50,18 @@ export default function Layout() {
           <div className="flex items-center gap-2">
             {isLoggedIn && user ? (
               <>
+                <button
+                  onClick={() => navigate('/messages')}
+                  className="relative p-2 rounded-xl text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-all active:scale-[0.95]"
+                  title="消息"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm border border-white">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
                 <div className="flex items-center gap-2 pr-1">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 via-violet-400 to-fuchsia-400 p-[2px] shadow-md">
                   <img

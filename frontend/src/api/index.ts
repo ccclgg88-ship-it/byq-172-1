@@ -6,6 +6,7 @@ import type {
   CompareResult,
   Comment,
   FriendList,
+  Message,
 } from '@/types';
 
 const BASE = '/api';
@@ -116,6 +117,24 @@ export const api = {
     },
     deleteComment(commentId: string) {
       return request<{ success: boolean }>(`/wall/comments/${commentId}`, { method: 'DELETE' });
+    },
+  },
+
+  messages: {
+    getUnreadCount() {
+      return request<{ count: number }>('/messages/unread-count');
+    },
+    list(type: 'all' | 'like' | 'comment' | 'follow' = 'all', page = 1) {
+      const params = new URLSearchParams();
+      if (type !== 'all') params.append('type', type);
+      params.append('page', String(page));
+      return request<PaginatedResult<Message>>(`/messages?${params.toString()}`);
+    },
+    markRead(id: string) {
+      return request<{ success: boolean }>(`/messages/${id}/read`, { method: 'POST' });
+    },
+    markAllRead() {
+      return request<{ success: boolean }>('/messages/read-all', { method: 'POST' });
     },
   },
 };

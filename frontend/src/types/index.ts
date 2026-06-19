@@ -60,3 +60,19 @@ export interface FriendList {
   following: FriendItem[];
   followers: FriendItem[];
 }
+
+export type MessageType = 'like' | 'comment' | 'follow' | 'mutual_follow';
+
+export interface Message {
+  id: string;
+  type: MessageType;
+  senderId?: string;
+  senderNickname?: string;
+  senderAvatar?: string;
+  assessmentId?: string;
+  assessmentTitle?: string;
+  commentId?: string;
+  content?: string;
+  read: boolean;
+  createdAt: string;
+}

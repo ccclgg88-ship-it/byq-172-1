@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getDb, AssessmentRow, UserRow, LikeRow, CommentRow } from '../db.js';
+import { getDb, AssessmentRow, UserRow, LikeRow, CommentRow, createMessage } from '../db.js';
 import { authMiddleware, optionalAuth } from '../auth.js';
 
 const router = Router();
@@ -134,6 +134,14 @@ router.post('/:id/like', authMiddleware, (req: Request, res: Response) => {
     res.json({ liked: false });
   } else {
     db.prepare('INSERT INTO likes (user_id, assessment_id) VALUES (?, ?)').run(userId, id);
+    if (userId !== assessment.user_id) {
+      const blocked = db.prepare(
+        'SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?'
+      ).get(assessment.user_id, userId);
+      if (!blocked) {
+        createMessage(db, userId, assessment.user_id, 'like', assessment.id);
+      }
+    }
     res.json({ liked: true });
   }
 });
@@ -184,10 +192,21 @@ router.post('/:id/comments', authMiddleware, (req: Request, res: Response) => {
   }
 
   const commentId = uuid();
+  const trimmedContent = content.trim();
 
   db.prepare(
     'INSERT INTO comments (id, assessment_id, user_id, content) VALUES (?, ?, ?, ?)'
-  ).run(commentId, id, userId, content.trim());
+  ).run(commentId, id, userId, trimmedContent);
+
+  if (userId !== assessment.user_id) {
+    const blocked = db.prepare(
+      'SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?'
+    ).get(assessment.user_id, userId);
+    if (!blocked) {
+      const summary = trimmedContent.slice(0, 30);
+      createMessage(db, userId, assessment.user_id, 'comment', assessment.id, commentId, summary);
+    }
+  }
 
   const user = db.prepare('SELECT nickname, avatar FROM users WHERE id = ?').get(userId) as { nickname: string; avatar: string };
 
@@ -196,7 +215,7 @@ router.post('/:id/comments', authMiddleware, (req: Request, res: Response) => {
     userId,
     nickname: user.nickname,
     avatar: user.avatar,
-    content: content.trim(),
+    content: trimmedContent,
   });
 });
 

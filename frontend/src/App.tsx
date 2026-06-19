@@ -6,6 +6,7 @@ import LoginPage from '@/pages/LoginPage';
 import HomePage from '@/pages/HomePage';
 import ProfilePage from '@/pages/ProfilePage';
 import WallPage from '@/pages/WallPage';
+import MessagesPage from '@/pages/MessagesPage';
 
 function App() {
   const { isLoggedIn, token, user, checkAuth } = useAuthStore();
@@ -37,6 +38,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/profile" element={isLoggedIn ? <ProfilePage /> : <Navigate to="/login" replace />} />
           <Route path="/wall" element={<WallPage />} />
+          <Route path="/messages" element={isLoggedIn ? <MessagesPage /> : <Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
