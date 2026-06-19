@@ -40,6 +40,7 @@ export default function WallPage() {
   const [friends, setFriends] = useState<FriendList | null>(null);
   const [blockConfirm, setBlockConfirm] = useState<string | null>(null);
   const [showFollowList, setShowFollowList] = useState(false);
+  const [likeLoading, setLikeLoading] = useState<Record<string, boolean>>({});
 
   const loadWall = useCallback(async (p = 1, s = sort, append = false) => {
     const isFirst = !append;
@@ -83,6 +84,8 @@ export default function WallPage() {
       navigate('/login');
       return;
     }
+    if (likeLoading[id]) return;
+    setLikeLoading((prev) => ({ ...prev, [id]: true }));
     try {
       const res = await api.wall.like(id);
       setItems((prev) =>
@@ -91,20 +94,31 @@ export default function WallPage() {
             ? {
                 ...it,
                 isLiked: res.liked,
-                likeCount: (it.likeCount || 0) + (res.liked ? 1 : -1),
+                likeCount: Math.max(0, (it.likeCount || 0) + (res.liked ? 1 : -1)),
               }
             : it
         )
       );
     } catch (err: any) {
       alert(err.message || '操作失败');
+    } finally {
+      setLikeLoading((prev) => {
+        const { [id]: _, ...rest } = prev;
+        return rest;
+      });
     }
   };
 
   const toggleComments = async (id: string) => {
     if (expandedComments[id]) {
-      const { [id]: _, ...rest } = expandedComments;
-      setExpandedComments(rest);
+      setExpandedComments((prev) => {
+        const { [id]: _, ...rest } = prev;
+        return rest;
+      });
+      return;
+    }
+    if (!isLoggedIn) {
+      navigate('/login');
       return;
     }
     try {
@@ -138,7 +152,10 @@ export default function WallPage() {
     } catch (err: any) {
       alert(err.message || '留言失败');
     } finally {
-      setSubmittingComments((prev) => ({ ...prev, [assessmentId]: false }));
+      setSubmittingComments((prev) => {
+        const { [assessmentId]: _, ...rest } = prev;
+        return rest;
+      });
     }
   };
 
@@ -188,7 +205,7 @@ export default function WallPage() {
       await api.social.block(targetId);
       setItems((prev) => prev.filter((it) => it.userId !== targetId));
       setBlockConfirm(null);
-      alert(`已拉黑 ${nickname}`);
+      api.social.listFriends().then((r) => setFriends(r)).catch(() => {});
     } catch (err: any) {
       alert(err.message || '操作失败');
     }
@@ -196,8 +213,11 @@ export default function WallPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+      <div className="flex items-center justify-center py-24">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
+          <span className="text-sm text-slate-400 font-medium">加载中...</span>
+        </div>
       </div>
     );
   }
@@ -205,26 +225,28 @@ export default function WallPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Users className="w-5 h-5 text-brand-600" />
-            好友人设墙
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {isLoggedIn ? '看看朋友们都是什么人设' : '浏览公开示例，登录后可关注互动'}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-md shadow-pink-200">
+            <Users className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">好友人设墙</h1>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {isLoggedIn ? '看看朋友们都是什么人设' : '浏览公开示例，登录后可关注互动'}
+            </p>
+          </div>
         </div>
         {isLoggedIn && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFollowList(true)}
-              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors"
             >
               关注 {friends?.following.length || 0}
             </button>
             <button
               onClick={() => setShowInvite(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-semibold shadow-md shadow-pink-200 hover:shadow-lg hover:shadow-pink-300 transition-all active:scale-[0.97]"
             >
               <UserPlus className="w-4 h-4" />
               添加好友
@@ -233,41 +255,47 @@ export default function WallPage() {
         )}
       </div>
 
-      <div className="flex gap-2 p-1 bg-white rounded-xl border border-slate-100">
+      <div className="flex gap-2 p-1 bg-white rounded-2xl border border-slate-100 shadow-sm">
+        <button
+          onClick={() => handleSortChange('latest')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            sort === 'latest'
+              ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-md shadow-indigo-200'
+              : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          最新
+        </button>
+        {isLoggedIn && (
           <button
-            onClick={() => handleSortChange('latest')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-              sort === 'latest' ? 'bg-brand-50 text-brand-600' : 'text-slate-400 hover:text-slate-600'
+            onClick={() => handleSortChange('compatibility')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              sort === 'compatibility'
+                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-200'
+                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Clock className="w-4 h-4" />
-            最新
+            <TrendingUp className="w-4 h-4" />
+            合拍度
           </button>
-          {isLoggedIn && (
-            <button
-              onClick={() => handleSortChange('compatibility')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                sort === 'compatibility' ? 'bg-brand-50 text-brand-600' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4" />
-              合拍度
-            </button>
-          )}
-        </div>
+        )}
+      </div>
 
       {!isLoggedIn && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-5 flex items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-2xl p-5 flex items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <LogIn className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <LogIn className="w-4.5 h-4.5 text-amber-600" />
+            </div>
             <div>
-              <p className="font-medium text-amber-800 text-sm mb-0.5">以游客身份浏览</p>
-              <p className="text-xs text-amber-600/80">登录后可关注好友、点赞留言、查看合拍度</p>
+              <p className="font-bold text-amber-900 text-sm">以游客身份浏览</p>
+              <p className="text-xs text-amber-700/80 mt-0.5">登录后可关注好友、点赞留言、查看合拍度</p>
             </div>
           </div>
           <button
             onClick={() => navigate('/login')}
-            className="px-4 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-amber-600 transition-colors flex-shrink-0"
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors shadow-sm flex-shrink-0"
           >
             登录
           </button>
@@ -275,27 +303,27 @@ export default function WallPage() {
       )}
 
       {items.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-slate-300" />
+        <div className="bg-white rounded-3xl border border-slate-100 p-14 text-center shadow-sm">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center mx-auto mb-5">
+            <Users className="w-10 h-10 text-pink-300" />
           </div>
-          <div className="text-slate-700 font-medium mb-1">
+          <div className="text-slate-800 font-bold text-lg mb-1">
             {isLoggedIn ? '还没有好友动态' : '暂无公开内容'}
           </div>
-          <p className="text-xs text-slate-400 mb-5">
+          <p className="text-sm text-slate-400 mb-6">
             {isLoggedIn ? '关注好友或等待好友发布测评' : '登录后发现更多精彩人设'}
           </p>
           {isLoggedIn ? (
             <button
               onClick={() => setShowInvite(true)}
-              className="px-5 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold shadow-md shadow-pink-200 hover:shadow-lg hover:shadow-pink-300 transition-all active:scale-[0.97]"
             >
               添加好友
             </button>
           ) : (
             <button
               onClick={() => navigate('/login')}
-              className="px-5 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-bold shadow-md shadow-indigo-200 hover:shadow-lg hover:shadow-indigo-300 transition-all active:scale-[0.97]"
             >
               去登录
             </button>
@@ -306,31 +334,35 @@ export default function WallPage() {
           {items.map((item, idx) => (
             <div
               key={item.id}
-              className="bg-white rounded-2xl border border-slate-100 overflow-hidden animate-fade-in-up"
+              className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md hover:shadow-slate-100 transition-shadow animate-fade-in-up"
               style={{ animationDelay: `${Math.min(idx * 40, 400)}ms` }}
             >
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3 min-w-0">
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <img
                       src={item.avatar}
                       alt={item.nickname}
-                      className="w-10 h-10 rounded-full bg-slate-100 flex-shrink-0"
+                      className="w-11 h-11 rounded-full bg-slate-100 flex-shrink-0 ring-2 ring-white shadow-md"
                     />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-slate-800 text-sm truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-800 text-sm truncate">
                         {item.nickname}
                       </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
+                      <div className="text-xs text-slate-400 mt-0.5 font-medium">
                         {formatTime(item.createdAt)}
-                        {item.visibility === 'public' && <span className="ml-2">· 公开</span>}
+                        {item.visibility === 'public' && isLoggedIn && (
+                          <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-600 text-[10px] font-bold border border-sky-100">
+                            公开
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {item.compatibility !== undefined && !item.isGuest && (
-                      <div className="px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100">
-                        <span className="text-xs font-semibold text-pink-600">
+                    {item.compatibility !== undefined && isLoggedIn && (
+                      <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100 shadow-sm">
+                        <span className="text-xs font-extrabold text-pink-600">
                           ♡ {item.compatibility}%
                         </span>
                       </div>
@@ -338,22 +370,30 @@ export default function WallPage() {
                     {isLoggedIn && item.userId !== user?.id && (
                       <button
                         onClick={() => setBlockConfirm(item.userId!)}
-                        className="p-1.5 rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
-                        title="拉黑"
+                        className="p-2 rounded-xl text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+                        title="拉黑此用户"
                       >
-                        <Ban className="w-3.5 h-3.5" />
+                        <Ban className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div className="mb-3">
-                  <div className="text-lg font-bold text-slate-800 mb-2">{item.title}</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {item.tags.map((t) => (
+                <div className="mb-4">
+                  <div className="text-xl font-extrabold text-slate-800 mb-3 tracking-tight">
+                    {item.title}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {item.tags.map((t, i) => (
                       <span
                         key={t}
-                        className="px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs font-medium border border-slate-100"
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border ${
+                          i === 0
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                            : i === 1
+                            ? 'bg-violet-50 text-violet-700 border-violet-100'
+                            : 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100'
+                        }`}
                       >
                         #{t}
                       </span>
@@ -361,66 +401,74 @@ export default function WallPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 pt-3 border-t border-slate-50">
+                <div className="flex items-center gap-2 pt-3 border-t border-slate-50">
                   <button
                     onClick={() => handleLike(item.id)}
-                    disabled={!isLoggedIn}
-                    className={`flex items-center gap-1.5 py-1 px-2 rounded-lg transition-colors ${
+                    disabled={likeLoading[item.id]}
+                    className={`flex items-center gap-1.5 py-2 px-3.5 rounded-xl transition-all active:scale-[0.95] ${
                       item.isLiked
-                        ? 'text-rose-500'
-                        : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
-                    }`}
+                        ? 'bg-rose-50 text-rose-500 border border-rose-100'
+                        : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50 border border-transparent'
+                    } disabled:opacity-60`}
                   >
-                    <Heart className={`w-4 h-4 ${item.isLiked ? 'fill-current' : ''}`} />
-                    <span className="text-xs font-medium">{item.likeCount || 0}</span>
+                    <Heart className={`w-4.5 h-4.5 ${item.isLiked ? 'fill-current' : ''}`} />
+                    <span className="text-xs font-bold">{item.likeCount || 0}</span>
                   </button>
                   <button
                     onClick={() => toggleComments(item.id)}
-                    className="flex items-center gap-1.5 py-1 px-2 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-brand-50 transition-colors"
+                    className={`flex items-center gap-1.5 py-2 px-3.5 rounded-xl transition-all border border-transparent ${
+                      expandedComments[item.id]
+                        ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                        : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'
+                    }`}
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span className="text-xs font-medium">{item.commentCount || 0}</span>
+                    <MessageCircle className={`w-4.5 h-4.5 ${expandedComments[item.id] ? 'fill-current' : ''}`} />
+                    <span className="text-xs font-bold">{item.commentCount || 0}</span>
                   </button>
                 </div>
               </div>
 
               {expandedComments[item.id] && (
-                <div className="bg-slate-50 border-t border-slate-100 px-4 py-3 space-y-3">
+                <div className="bg-slate-50 border-t border-slate-100 px-5 py-4 space-y-3">
                   {expandedComments[item.id].length === 0 ? (
-                    <div className="text-center py-3 text-xs text-slate-400">暂无留言，来留一句吧～</div>
+                    <div className="text-center py-4 text-xs text-slate-400 font-medium">
+                      还没有留言，来留一句吧～
+                    </div>
                   ) : (
                     expandedComments[item.id].map((c) => (
-                      <div key={c.id} className="flex gap-2.5 animate-slide-in">
+                      <div key={c.id} className="flex gap-3 animate-slide-in">
                         <img
                           src={c.avatar}
                           alt={c.nickname}
-                          className="w-7 h-7 rounded-full bg-white flex-shrink-0"
+                          className="w-8 h-8 rounded-full bg-white border-2 border-white shadow-sm flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <span className="text-xs font-semibold text-slate-700">{c.nickname}</span>
-                              <span className="text-[10px] text-slate-400 ml-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs font-bold text-slate-700">{c.nickname}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">
                                 {formatTime(c.createdAt)}
                               </span>
                             </div>
                             {(c.userId === user?.id || item.userId === user?.id) && (
                               <button
                                 onClick={() => handleDeleteComment(c.id, item.id)}
-                                className="text-slate-300 hover:text-rose-500 transition-colors flex-shrink-0"
+                                className="text-slate-300 hover:text-rose-500 transition-colors flex-shrink-0 p-0.5 rounded-md hover:bg-rose-50"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             )}
                           </div>
-                          <p className="text-sm text-slate-600 mt-0.5 break-words">{c.content}</p>
+                          <p className="text-sm text-slate-600 mt-1 break-words leading-relaxed">
+                            {c.content}
+                          </p>
                         </div>
                       </div>
                     ))
                   )}
 
                   {isLoggedIn && (
-                    <div className="flex gap-2 pt-2 border-t border-slate-100">
+                    <div className="flex gap-2.5 pt-3 border-t border-slate-200/70">
                       <input
                         type="text"
                         value={commentInputs[item.id] || ''}
@@ -435,12 +483,12 @@ export default function WallPage() {
                         }}
                         placeholder="留一句（最多100字）..."
                         maxLength={100}
-                        className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none text-sm transition-all"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none text-sm transition-all font-medium"
                       />
                       <button
                         onClick={() => handleSubmitComment(item.id)}
                         disabled={submittingComments[item.id] || !commentInputs[item.id]?.trim()}
-                        className="px-3.5 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-bold shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.97] flex items-center justify-center"
                       >
                         {submittingComments[item.id] ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -459,7 +507,7 @@ export default function WallPage() {
             <button
               onClick={() => loadWall(page + 1, sort, true)}
               disabled={loadingMore}
-              className="w-full py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 text-sm hover:bg-slate-50 hover:border-slate-300 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+              className="w-full py-3 rounded-2xl bg-white border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 hover:text-slate-700 transition-all flex items-center justify-center gap-1.5 disabled:opacity-60"
             >
               {loadingMore ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -473,74 +521,86 @@ export default function WallPage() {
       )}
 
       {showInvite && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl animate-fade-in-up overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-800">添加好友</h3>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl shadow-2xl animate-fade-in-up overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-50 bg-gradient-to-r from-pink-50 to-rose-50">
+              <h3 className="font-bold text-slate-800 text-lg">添加好友</h3>
               <button
                 onClick={() => {
                   setShowInvite(false);
                   setFollowMsg(null);
                   setFollowCode('');
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-5 space-y-5">
+            <div className="p-6 space-y-6">
               <div>
-                <div className="text-xs font-medium text-slate-500 mb-2">我的邀请码</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-brand-50 to-purple-50 border border-brand-100 font-mono text-lg font-bold text-brand-700 tracking-widest text-center select-all">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                  我的邀请码
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="flex-1 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-50 via-violet-50 to-pink-50 border border-indigo-100 font-mono text-xl font-extrabold text-indigo-700 tracking-[0.2em] text-center select-all">
                     {inviteCode || '— — —'}
                   </div>
                   <button
                     onClick={handleCopyInvite}
-                    className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                    className="p-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
                     title="复制邀请码"
                   >
-                    {copied ? <Check className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
+                    {copied ? (
+                      <Check className="w-5 h-5 text-emerald-500" />
+                    ) : (
+                      <Copy className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-2">
+                <p className="text-xs text-slate-400 mt-2.5 font-medium">
                   把邀请码发给朋友，对方输入后你们就能互相关注
                 </p>
               </div>
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-100" />
+                  <div className="w-full border-t border-dashed border-slate-200" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-white px-3 text-xs text-slate-400">或</span>
+                  <span className="bg-white px-3 text-xs font-bold text-slate-400">或者</span>
                 </div>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-slate-500 mb-2">输入朋友的邀请码</div>
-                <div className="flex gap-2">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                  输入朋友的邀请码
+                </div>
+                <div className="flex gap-2.5">
                   <input
                     type="text"
                     value={followCode}
                     onChange={(e) => setFollowCode(e.target.value.toUpperCase())}
                     placeholder="8 位邀请码"
                     maxLength={8}
-                    className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none font-mono text-center text-lg font-bold tracking-widest uppercase transition-all"
+                    className="flex-1 px-4 py-3.5 rounded-2xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none font-mono text-center text-lg font-extrabold tracking-[0.15em] uppercase transition-all"
                   />
                   <button
                     onClick={handleFollow}
                     disabled={followLoading || followCode.length < 4}
-                    className="px-5 py-3 rounded-xl bg-brand-600 text-white font-medium hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold shadow-md shadow-pink-200 hover:shadow-lg hover:shadow-pink-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.97] flex items-center gap-1.5"
                   >
-                    {followLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                    {followLoading ? (
+                      <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                    ) : (
+                      <UserPlus className="w-4.5 h-4.5" />
+                    )}
                     关注
                   </button>
                 </div>
                 {followMsg && (
                   <div
-                    className={`text-xs mt-2 ${
+                    className={`text-xs mt-2.5 font-bold ${
                       followMsg.type === 'success' ? 'text-emerald-600' : 'text-rose-500'
                     }`}
                   >
@@ -554,24 +614,24 @@ export default function WallPage() {
       )}
 
       {showFollowList && friends && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl animate-fade-in-up overflow-hidden max-h-[70vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
-              <h3 className="font-bold text-slate-800">我的好友</h3>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl shadow-2xl animate-fade-in-up overflow-hidden max-h-[75vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-50 bg-gradient-to-r from-indigo-50 to-violet-50 flex-shrink-0">
+              <h3 className="font-bold text-slate-800 text-lg">我的好友</h3>
               <button
                 onClick={() => setShowFollowList(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5 overflow-y-auto scrollbar-thin flex-1 space-y-5">
+            <div className="p-6 overflow-y-auto scrollbar-thin flex-1 space-y-6">
               <div>
-                <div className="text-xs font-medium text-slate-400 mb-2.5">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
                   我关注的（{friends.following.length}/50）
                 </div>
                 {friends.following.length === 0 ? (
-                  <div className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-xl">
+                  <div className="text-xs text-slate-400 py-5 text-center bg-slate-50 rounded-2xl font-medium">
                     还没有关注任何人
                   </div>
                 ) : (
@@ -579,21 +639,21 @@ export default function WallPage() {
                     {friends.following.map((f) => (
                       <div
                         key={f.id}
-                        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors"
                       >
                         <img
                           src={f.avatar}
                           alt={f.nickname}
-                          className="w-9 h-9 rounded-full bg-slate-100"
+                          className="w-10 h-10 rounded-full bg-slate-100 shadow-sm ring-2 ring-white"
                         />
-                        <span className="text-sm font-medium text-slate-700 flex-1">{f.nickname}</span>
+                        <span className="text-sm font-bold text-slate-700 flex-1">{f.nickname}</span>
                         <button
                           onClick={() => {
                             api.social.unfollow(f.id).then(() => {
                               api.social.listFriends().then((r) => setFriends(r));
                             });
                           }}
-                          className="px-3 py-1 rounded-lg text-xs text-slate-500 hover:bg-rose-50 hover:text-rose-500 transition-colors"
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-rose-50 hover:text-rose-500 transition-colors"
                         >
                           取消关注
                         </button>
@@ -603,11 +663,11 @@ export default function WallPage() {
                 )}
               </div>
               <div>
-                <div className="text-xs font-medium text-slate-400 mb-2.5">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
                   关注我的（{friends.followers.length}）
                 </div>
                 {friends.followers.length === 0 ? (
-                  <div className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-xl">
+                  <div className="text-xs text-slate-400 py-5 text-center bg-slate-50 rounded-2xl font-medium">
                     还没人关注你
                   </div>
                 ) : (
@@ -615,14 +675,14 @@ export default function WallPage() {
                     {friends.followers.map((f) => (
                       <div
                         key={f.id}
-                        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors"
                       >
                         <img
                           src={f.avatar}
                           alt={f.nickname}
-                          className="w-9 h-9 rounded-full bg-slate-100"
+                          className="w-10 h-10 rounded-full bg-slate-100 shadow-sm ring-2 ring-white"
                         />
-                        <span className="text-sm font-medium text-slate-700 flex-1">{f.nickname}</span>
+                        <span className="text-sm font-bold text-slate-700 flex-1">{f.nickname}</span>
                       </div>
                     ))}
                   </div>
@@ -634,19 +694,19 @@ export default function WallPage() {
       )}
 
       {blockConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in-up">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
-              <Ban className="w-6 h-6 text-amber-500" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-fade-in-up">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center mb-4">
+              <Ban className="w-7 h-7 text-amber-500" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1">确认拉黑？</h3>
-            <p className="text-sm text-slate-500 mb-6">
+            <h3 className="text-xl font-bold text-slate-800 mb-1">确认拉黑？</h3>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
               拉黑后双方将不再出现在彼此的人设墙上，且会取消关注关系。
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setBlockConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200 transition-colors"
               >
                 取消
               </button>
@@ -655,7 +715,7 @@ export default function WallPage() {
                   const target = items.find((i) => i.userId === blockConfirm);
                   handleBlock(blockConfirm, target?.nickname || '该用户');
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold shadow-md shadow-amber-200 hover:shadow-lg transition-all active:scale-[0.97]"
               >
                 确认拉黑
               </button>

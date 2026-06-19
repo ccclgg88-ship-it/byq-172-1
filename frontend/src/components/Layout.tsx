@@ -19,42 +19,49 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2.5 cursor-pointer"
             onClick={() => navigate('/')}
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-sm">
-              <Sparkles className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-200">
+              <Sparkles className="w-4.5 h-4.5 text-white" />
             </div>
-            <span className="font-bold text-lg text-slate-800">人设实验室</span>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-lg bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
+                人设实验室
+              </span>
+              <span className="text-[10px] text-slate-400 -mt-0.5">发现真实的自己</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {isLoggedIn && user ? (
               <>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pr-1">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 via-violet-400 to-fuchsia-400 p-[2px] shadow-md">
                   <img
                     src={user.avatar}
                     alt={user.nickname}
-                    className="w-7 h-7 rounded-full bg-slate-100"
+                    className="w-full h-full rounded-full bg-white object-cover"
                   />
-                  <span className="text-sm text-slate-600 hidden sm:block">{user.nickname}</span>
+                </div>
+                  <span className="text-sm font-semibold text-slate-700 hidden sm:block">{user.nickname}</span>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all active:scale-[0.95]"
                   title="退出登录"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4.5 h-4.5" />
                 </button>
               </>
             ) : (
               <button
                 onClick={() => navigate('/login')}
-                className="px-4 py-1.5 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors font-medium"
+                className="px-5 py-2 text-sm rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white hover:shadow-lg hover:shadow-violet-200 transition-all font-bold active:scale-[0.97]"
               >
                 登录
               </button>
@@ -63,12 +70,12 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 pb-24">
+      <main className="max-w-3xl mx-auto px-4 py-6 pb-28">
         <Outlet />
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-around">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] z-40">
+        <div className="max-w-3xl mx-auto px-3 h-20 flex items-center justify-around pb-[6px]">
           {navItems.map((item) => {
             if (item.requireAuth && !isLoggedIn) return null;
             const Icon = item.icon;
@@ -77,12 +84,19 @@ export default function Layout() {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`flex flex-col items-center gap-0.5 px-6 py-2 rounded-xl transition-colors ${
-                  active ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'
+                className={`relative flex flex-col items-center gap-0.5 px-6 py-2 rounded-2xl transition-all ${
+                  active
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : ''}`} />
-                <span className="text-xs font-medium">{item.label}</span>
+                {active && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 rounded-2xl shadow-lg shadow-violet-200" />
+                )}
+                <div className={`relative z-10 flex flex-col items-center gap-0.5 transition-transform ${active ? 'scale-105' : ''}`}>
+                  <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : ''}`} />
+                  <span className="text-xs font-bold">{item.label}</span>
+                </div>
               </button>
             );
           })}
